@@ -93,6 +93,7 @@ GROUP BY r.business_id
 set @beta = 0.7;
 set @alpha = 1-@beta;
 
+
 SELECT	b.business_id,  r15q1.rating as rating_2015Q1,
 						r15q2.rating as rating_2015Q2,
                         r15q3.rating as rating_2015Q3,
@@ -102,7 +103,8 @@ SELECT	b.business_id,  r15q1.rating as rating_2015Q1,
                         r16q2.rating as rating_2016Q2,
                         r16q3.rating as rating_2016Q3,
                         r16q4.rating as rating_2016Q4,
-                        @alpha * (power(@beta, 0) * r16q4.rating + power(@beta, 1) * r16q3.rating + power(@beta, 2) * r16q2.rating + power(@beta, 3) * r16q1.rating + power(@beta, 4) * r15q4.rating + power(@beta, 5) * r15q3.rating + power(@beta, 6) * r15q2.rating) + power(@beta,7) * r15q1.rating AS rating_exponential_smoothing
+                        @alpha * (power(@beta, 0) * r16q4.rating + power(@beta, 1) * r16q3.rating + power(@beta, 2) * r16q2.rating + power(@beta, 3) * r16q1.rating + power(@beta, 4) * r15q4.rating + power(@beta, 5) * r15q3.rating + power(@beta, 6) * r15q2.rating) + power(@beta,7) * r15q1.rating AS rating_exponential_smoothing,
+                        b.neighborhood
                         
 FROM dim_business b  join ratings_2015Q1 r15q1 on b.business_id = r15q1.business_id
 					 join ratings_2015Q2 r15q2 on b.business_id = r15q2.business_id
@@ -114,4 +116,4 @@ FROM dim_business b  join ratings_2015Q1 r15q1 on b.business_id = r15q1.business
                      join ratings_2016Q4 r16q4 on b.business_id = r16q4.business_id
 
 ORDER BY rating_exponential_smoothing DESC
-LIMIT 10;
+LIMIT 100;
