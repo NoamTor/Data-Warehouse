@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS ratings_2016Q2;
 DROP TABLE IF EXISTS ratings_2016Q3;
 DROP TABLE IF EXISTS ratings_2016Q4;
 DROP TABLE IF EXISTS expo_smoothing;
+DROP TABLE IF EXISTS business_rating;
 
 CREATE TEMPORARY TABLE IF NOT EXISTS ratings_2015Q1 AS
 (
@@ -87,6 +88,7 @@ FROM fact_reviews r left outer join dim_users u on r.user_id = u.user_id
 		left join dim_dates d on r.date_id = d.date_id
 WHERE d.year = 2016 and d.month between 10 AND 12
 GROUP BY r.business_id
+);
 
 
 set @beta = 0.7;
@@ -119,10 +121,80 @@ FROM dim_business b  join ratings_2015Q1 r15q1 on b.business_id = r15q1.business
 ORDER BY rating_exponential_smoothing DESC
 );
 
-select * from expo_smoothing limit 5;
 
-
-SELECT	b.business_id, truncate(e.rating_exponential_smoothing, 4) as 'rating_exponential_smoothing', truncate((e.rating_exponential_smoothing / e.rating_2016Q4) - 1, 4) as 'Change Percent from last quarter'
+CREATE TEMPORARY TABLE IF NOT EXISTS business_rating AS
+(
+SELECT	b.business_id, b.neighborhood, truncate(e.rating_exponential_smoothing, 4) as 'rating_exponential_smoothing', truncate((e.rating_exponential_smoothing / e.rating_2016Q4) - 1, 4) as 'Change Percent from last quarter'
 FROM dim_business b join expo_smoothing e on b.business_id = e.business_id
 Where e.rating_exponential_smoothing > 50 and e.rating_2016Q4 > 50 # Noise avoidence
-order by 3 desc;
+order by 4 desc
+);
+
+
+DROP TABLE IF EXISTS semi_final;
+
+CREATE TEMPORARY TABLE IF NOT EXISTS semi_final AS
+(
+select	br.business_id, b.business_name, br.neighborhood, b.business_stars, br.`Change Percent from last quarter`,
+		b.`art & enteraitment`, b.`bars & alcohol`, b.`beauty & spa`, b.`cars & transportation`, b.fashion, b.finance, b.food, b.health,b.other, b.`real estate`, b.stores, b.turists
+from	business_rating br left join dim_business b on br.business_id = b.business_id
+where 	br.neighborhood in ('Downtown', 'Lawrenceville', 'Strip District')
+		and br.`Change Percent from last quarter` > 0
+);
+
+CREATE TEMPORARY TABLE IF NOT EXISTS downtown_nofood AS
+(
+select 	* #business_id, business_name, neighborhood, business_stars, `Change Percent from last quarter`
+from 	semi_final
+where 	neighborhood = 'Downtown'
+		and food = 0
+);
+
+CREATE TEMPORARY TABLE IF NOT EXISTS downtown_food_n_more AS
+(
+select 	* #business_id, business_name, neighborhood, business_stars, `Change Percent from last quarter`
+from 	semi_final
+where 	neighborhood = 'Downtown'
+		and food = 1
+		and
+        (
+        `art & enteraitment` = 1
+        or `bars & alcohol` = 1
+        or `beauty & spa` = 1
+        or `cars & transportation` = 1
+        or fashion = 1
+        or finance = 1
+        or health =1
+        or other=1
+        or `real estate`=1
+        or stores=1
+        or turists=1
+        )
+  );     
+
+CREATE TEMPORARY TABLE IF NOT EXISTS lawrenceville AS
+(
+select 	* #business_id, business_name, neighborhood, business_stars, `Change Percent from last quarter`
+from 	semi_final
+where 	neighborhood = 'Lawrenceville'
+		and food = 1
+ );
+ 
+ CREATE TEMPORARY TABLE IF NOT EXISTS strip_dist AS
+(
+select 	* #business_id, business_name, neighborhood, business_stars, `Change Percent from last quarter`
+from 	semi_final
+where 	neighborhood = 'Strip District'
+		and  `bars & alcohol` = 1
+);
+
+
+select * from downtown_nofood
+union
+select * from downtown_food_n_more
+union
+select * from lawrenceville
+union
+select * from strip_dist
+
+
